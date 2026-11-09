@@ -1,0 +1,29 @@
+# Vercel installs from this file when building the Python function in api/.
+#
+# It mirrors the runtime dependencies of apps/api/pyproject.toml, which stays
+# the source of truth for local work and CI. Keep the two in step: a dependency
+# added there and not here builds locally and 500s in production.
+#
+# Deliberately excluded:
+#   uvicorn  - Vercel supplies the ASGI server; a second one is dead weight in
+#              a bundle that has a size limit.
+#   alembic  - migrations are run out of band against Neon, never by the
+#              function. See api/index.py.
+
+fastapi>=0.115
+sqlalchemy>=2.0.36
+psycopg[binary]>=3.2
+pgvector>=0.3
+pydantic>=2.9
+pydantic-settings>=2.6
+pyjwt[crypto]>=2.10
+bcrypt>=4.2
+redis>=5.2
+structlog>=24.4
+sentry-sdk[fastapi]>=2.19
+email-validator>=2.2
+httpx>=0.28
+# zoneinfo needs an IANA database, which slim runtimes do not ship. The NYSE
+# session calendar is timezone-aware, so without this every market-hours call
+# raises ZoneInfoNotFoundError.
+tzdata>=2024.1
