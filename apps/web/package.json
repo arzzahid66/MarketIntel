@@ -15,6 +15,16 @@
     "react": "19.1.1",
     "react-dom": "19.1.1"
   },
+  "_comment_optionalDependencies": "Linux native binaries, pinned so they reach the lockfile. package-lock.json is generated on Windows, and npm records only the host platform's optional binaries - so `npm ci` on a Linux CI or host installs none of these and the build dies on a missing .node file. The first symptom was 'Cannot find module ../lightningcss.linux-x64-gnu.node' on Vercel; @next/swc would have been next. Versions must match their win32 siblings exactly, so bump these together.",
+  "optionalDependencies": {
+    "@esbuild/linux-x64": "0.28.2",
+    "@img/sharp-linux-x64": "0.35.4",
+    "@next/swc-linux-x64-gnu": "16.3.3",
+    "@rollup/rollup-linux-x64-gnu": "4.63.1",
+    "@tailwindcss/oxide-linux-x64-gnu": "4.3.3",
+    "@unrs/resolver-binding-linux-x64-gnu": "1.12.2",
+    "lightningcss-linux-x64-gnu": "1.32.0"
+  },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.13",
     "@types/node": "^22.10.2",
