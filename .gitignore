@@ -1,0 +1,56 @@
+# deps
+node_modules/
+.pnpm-store/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+
+# next
+.next/
+out/
+next-env.d.ts
+*.tsbuildinfo
+
+# env / secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+# apps/web/.env.local.example is byte-for-byte the same size as the real
+# .env.local, with the same mtime - the signature of a straight copy, so it may
+# carry real values. Excluded until someone confirms it holds placeholders.
+# Nothing needs it to deploy: Vercel and Netlify take their variables from the
+# dashboard, so this file is documentation only.
+.env.local.example
+
+# build / misc
+dist/
+build/
+coverage/
+.DS_Store
+*.log
+.vercel/
+
+# Credentials. server_cred/ holds a private SSH key (marketintel.pem) and a
+# host note - committing either would publish shell access to the server, and a
+# key in git history survives every later deletion.
+server_cred/
+*.pem
+*.key
+id_rsa*
+*.p12
+*.pfx
+
+# local verification artifacts (Playwright screenshots, snapshots)
+.playwright-mcp/
+*.png
+!apps/web/public/**/*.png
+!**/icon.png
+!**/logo*.png

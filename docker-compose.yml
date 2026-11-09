@@ -1,0 +1,36 @@
+# Local development dependencies only. Staging/production use Neon + Upstash.
+# Non-default host ports so this never collides with an existing local install.
+services:
+  postgres:
+    # pgvector, not plain postgres: the AI analyst searches article embeddings
+    # (Phase 4). Built on the same postgres:16 base, so an existing data volume
+    # keeps working - the extension is created by migration 0004.
+    image: pgvector/pgvector:pg16
+    container_name: mip-postgres
+    environment:
+      POSTGRES_USER: mip
+      POSTGRES_PASSWORD: mip
+      POSTGRES_DB: mip
+    ports:
+      - "5433:5432"
+    volumes:
+      - mip-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mip -d mip"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: mip-redis
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  mip-pgdata:

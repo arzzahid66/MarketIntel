@@ -1,0 +1,23 @@
+{
+  "name": "market-intelligence-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Subscription market-intelligence platform: Next.js + FastAPI + Postgres + Redis",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace apps/web",
+    "build:web": "npm run build --workspace apps/web",
+    "lint:web": "npm run lint --workspace apps/web",
+    "typecheck:web": "npm run typecheck --workspace apps/web",
+    "test:web": "npm run test --workspace apps/web",
+    "services:up": "docker compose up -d",
+    "services:down": "docker compose down",
+    "services:reset": "docker compose down -v && docker compose up -d"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "allowScripts": {}
+}

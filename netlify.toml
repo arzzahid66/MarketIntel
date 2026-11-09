@@ -1,0 +1,50 @@
+# Netlify: the Next.js web app only.
+#
+# Netlify hosts static assets plus short-lived serverless functions. It cannot
+# run the FastAPI API or the APScheduler worker - those go to Render
+# (see render.yaml). This file covers one of the three processes.
+#
+# Two things to know before trusting a deploy from here:
+#
+#   1. **SSE is capped.** `/api/market/stream` proxies an open event stream, and
+#      a Netlify function is killed at ~10s (26s on higher plans). The stream
+#      will be cut. `LiveDashboard` already falls back to polling, so the page
+#      degrades rather than breaks - but on Netlify, polling is the real
+#      transport, not the fallback.
+#   2. **`src/proxy.ts` runs on the Node runtime.** Netlify's Next adapter
+#      supports it, but it is the piece most likely to behave differently here,
+#      so check that an expired access cookie still redirects correctly.
+
+[build]
+  # The repo root is an npm workspace: install here, build the member. Building
+  # from inside apps/web would create a second lockfile, which breaks `npm ci`.
+  base = "."
+  command = "npm run build:web"
+  publish = "apps/web/.next"
+
+[build.environment]
+  NODE_VERSION = "20"
+  # The TypeScript step runs out of memory on Node's default heap.
+  NODE_OPTIONS = "--max-old-space-size=6144"
+
+[[plugins]]
+  package = "@netlify/plugin-nextjs"
+
+# NEXT_PUBLIC_API_URL must point at the deployed Render API, and is set in the
+# Netlify UI rather than here - it differs per environment, and a wrong value
+# committed to git is a staging build silently talking to production.
+#
+# Set it under: Site configuration -> Environment variables
+#   NEXT_PUBLIC_API_URL = https://mip-api.onrender.com
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    # next.config.ts sets these too; they are repeated here because Netlify
+    # serves static assets directly, without passing through Next.
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    # Staging is not for search engines. Remove this when the ToS and Privacy
+    # Policy are drafted and the site genuinely goes public.
+    X-Robots-Tag = "noindex, nofollow"

@@ -1,0 +1,91 @@
+# Free-tier worker: runs the ingest jobs on a schedule instead of a resident
+# process. Only needed if you are hosting without a paid always-on worker -
+# delete this file if `render.yaml`'s mip-worker is running, or the two will
+# both ingest and burn double the provider quota.
+#
+# This works because of two existing design decisions, not because of anything
+# added here:
+#
+#   * `worker.main --once` runs all ten jobs in dependency order and exits with
+#     a real status code. It was written as a CI smoke test.
+#   * Every job decides for itself whether there is work to do, so a missed run,
+#     a duplicate run or a run outside market hours is harmless.
+#
+# Limits worth knowing before relying on it: GitHub's scheduled triggers have a
+# 5-minute floor and are **delayed or dropped under load**, so this is best
+# effort, not a guarantee. The closing print in particular may land late.
+
+name: Scheduled ingest
+
+on:
+  schedule:
+    # **The schedule is budget arithmetic, not taste.** A free private repo gets
+    # 2,000 Actions minutes a month and a run costs ~2 minutes, so every 15
+    # minutes around the clock is 2,880 runs = ~5,760 minutes: nearly 3x over,
+    # and ingest would simply stop around day 10 of each month.
+    #
+    # Market hours on weekdays instead: 18 runs/day x 22 days = ~400 runs,
+    # ~800 minutes, comfortably inside the budget. Nothing is lost by not
+    # polling a closed market - `quotes_needed` returns False when the session
+    # is over anyway.
+    #
+    # 13:00-21:00 UTC spans the NYSE session in both EST and EDT, because cron
+    # has no concept of daylight saving.
+    - cron: "*/30 13-21 * * 1-5"
+    # One overnight pass so news, earnings and embeddings keep moving when the
+    # market is shut - those are not session-bound.
+    - cron: "0 2 * * *"
+  workflow_dispatch: # so you can trigger a catch-up by hand
+
+# A long ingest must never overlap itself: two runs scoring the same batch pay
+# twice for the same articles.
+concurrency:
+  group: scheduled-ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install
+        run: pip install -e "./apps/api" -e "./apps/worker"
+
+      - name: Run every job once
+        working-directory: apps/worker
+        env:
+          # Must match render.yaml. `staging` skips assert_production_safe(),
+          # which is what lets this run on the built-in auth with no Clerk
+          # account - and is exactly why the provider pins below matter.
+          ENVIRONMENT: staging
+          AUTH_PROVIDER: local
+          # Use a least-privilege Neon role here, not the owner connection
+          # string: these secrets are readable by anyone who can edit a
+          # workflow in this repository.
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          REDIS_URL: ${{ secrets.REDIS_URL }}
+          FINNHUB_API_KEY: ${{ secrets.FINNHUB_API_KEY }}
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          # Same free-tier Redis budget as the API.
+          QUOTE_INGEST_INTERVAL_SECONDS: "300"
+          UNIVERSE_QUOTE_INTERVAL_SECONDS: "900"
+          # Pinned, not `auto`. With `auto`, a secret that is missing or
+          # misspelled in this repository's settings makes the run quietly
+          # ingest *simulated* prices and headlines into the live database -
+          # and `price_bars` ingest is ON CONFLICT DO NOTHING, so those fake
+          # rows then win over the real ones forever. Pinned, the run fails
+          # loudly and the database stays clean.
+          MARKET_DATA_PROVIDER: finnhub
+          LLM_PROVIDER: openai
+          NEWS_SOURCE: finnhub
+          CALENDAR_SOURCE: finnhub
+        run: python -m worker.main --once

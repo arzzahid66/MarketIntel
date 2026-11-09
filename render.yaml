@@ -1,0 +1,119 @@
+# Render blueprint: the API only, on the free plan.
+#
+# Netlify/Vercel cannot host this service - it is an ASGI app that must stay
+# resident - so it lives here. The *worker* is deliberately not in this file:
+# Render's free tier has no background workers at all, so on the free path the
+# scheduler is replaced by .github/workflows/ingest.yml, which calls
+# `python -m worker.main --once` on a cron. See docs/DEPLOYMENT.md section 2.1.
+#
+# Secrets are `sync: false`: Render prompts for them once and stores them
+# encrypted. Nothing in this file is a credential.
+#
+# Deploy: Render dashboard -> New -> Blueprint -> point at this repo.
+
+services:
+  - type: web
+    name: mip-api
+    runtime: python
+    # Free: 750 instance-hours/month, and the service spins down after 15
+    # minutes without traffic. The first request after that waits ~1 minute
+    # while it wakes, so warm it before showing anyone.
+    plan: free
+    region: oregon
+    rootDir: apps/api
+    buildCommand: pip install -e ".[dev]"
+    # Migrations and the seed run here, so a fresh database builds its own
+    # schema and reference data. Both are idempotent, so a redeploy is safe.
+    # One uvicorn worker: the ingest process is separate and multiple workers
+    # would each hold their own in-process state.
+    startCommand: alembic upgrade head && python -m app.db.seed && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health/ready
+    envVars:
+      # `staging`, not `production`, and that is a deliberate trade.
+      #
+      # `assert_production_safe()` refuses to boot production on
+      # AUTH_PROVIDER=local, so production would require a configured Clerk
+      # account. Staging skips that check, which lets this deploy today on the
+      # built-in bcrypt + JWT auth.
+      #
+      # The cost is that staging skips *every* other check too - including the
+      # ones that refuse to serve simulated data. The explicit provider pins
+      # below are what replace that safety net. Do not remove them.
+      - key: ENVIRONMENT
+        value: staging
+      - key: PYTHON_VERSION
+        value: "3.13"
+      - key: AUTH_PROVIDER
+        value: local
+
+      # --- Pin every provider. This is the difference between live and fake. ---
+      #
+      # All four default to `auto` = "use the real provider if its key is
+      # present, otherwise simulate". Measured with no key, `auto` returns a
+      # provider named "simulated" for all four and raises nothing - so one
+      # typo'd secret would serve invented prices and headlines.
+      #
+      # Pinned, a missing key is a RuntimeError at boot: a deploy that fails
+      # visibly instead of a site that lies quietly.
+      - key: MARKET_DATA_PROVIDER
+        value: finnhub
+      - key: LLM_PROVIDER
+        value: openai
+      - key: NEWS_SOURCE
+        value: finnhub
+      - key: CALENDAR_SOURCE
+        value: finnhub
+
+      # --- Free-tier Redis budget ---
+      # Upstash free allows 10,000 commands/day and quote ingest writes one key
+      # per ticker per cycle across 48 tickers; the in-product defaults (60s /
+      # 300s) exceed that on a trading day. Drop these back when Redis is paid.
+      - key: QUOTE_INGEST_INTERVAL_SECONDS
+        value: "300"
+      - key: UNIVERSE_QUOTE_INTERVAL_SECONDS
+        value: "900"
+
+      # --- Secrets: entered in the Render dashboard, never in git ---
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        sync: false # Neon, on a project with the `vector` extension enabled.
+      - key: REDIS_URL
+        sync: false # Upstash, the rediss:// (TLS) form.
+      - key: FINNHUB_API_KEY
+        sync: false
+      - key: TWELVEDATA_API_KEY
+        sync: false # Without this there are still no signals or sparklines.
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: SENTRY_DSN
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false # The exact web origin, e.g. https://mip.vercel.app
+# ---------------------------------------------------------------------------
+# Upgrading off the free path
+#
+# Two things change when there is a budget (~$7/month each):
+#
+#   1. Set the service above to `plan: starter` - it stops sleeping, so no
+#      visitor ever waits a minute for a cold start, and SSE stays connected.
+#   2. Add the resident worker below and delete
+#      .github/workflows/ingest.yml, or the two will both ingest and burn
+#      double the provider quota.
+#
+#   - type: worker
+#     name: mip-worker
+#     runtime: python
+#     plan: starter          # a worker cannot be free: it must not sleep
+#     region: oregon
+#     rootDir: apps/worker
+#     buildCommand: pip install -e ".[dev]"
+#     # No migrations here - the API owns the schema, and two processes racing
+#     # `alembic upgrade` on a cold start is how a deploy deadlocks.
+#     startCommand: python -m worker.main
+#     envVars:                # same set as above, plus:
+#       - key: JWT_SECRET
+#         fromService:
+#           type: web
+#           name: mip-api
+#           envVarKey: JWT_SECRET

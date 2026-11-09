@@ -1,0 +1,30 @@
+[project]
+name = "mip-worker"
+version = "0.1.0"
+description = "Market Intelligence Platform - scheduled ingest worker"
+requires-python = ">=3.11"
+dependencies = [
+    "apscheduler>=3.10,<4",
+    "redis>=5.2",
+    "structlog>=24.4",
+    "sentry-sdk>=2.19",
+    "pydantic>=2.9",
+    "pydantic-settings>=2.6",
+    # The worker shares the API's domain layer (models, settings, seed) rather
+    # than duplicating it. Installed editable from ../api in the same venv.
+    "mip-api",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.3", "ruff>=0.8"]
+
+[tool.setuptools.packages.find]
+include = ["worker*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

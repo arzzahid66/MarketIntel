@@ -1,0 +1,198 @@
+@import "tailwindcss";
+
+/* ==========================================================================
+   Design tokens - build plan section 6.
+
+   The whole palette is here and nowhere else. Rules that hold across the app:
+     - Saturated colour means direction (bull/bear) and nothing else.
+     - One border radius, one border colour, zero box-shadows.
+       Depth comes from spacing.
+     - 8px spacing scale.
+     - Every figure is tabular-nums, or a price column looks subtly broken.
+   ========================================================================== */
+
+@theme {
+  --color-bg: #fafaf8; /* page */
+  --color-surface: #ffffff; /* table, panels */
+  --color-ink: #14161a; /* primary text */
+  --color-muted: #6b7280; /* labels, timestamps */
+  --color-line: #e5e5e2; /* borders - one weight, no shadows */
+  --color-bull: #0e8a5f;
+  --color-bear: #c8382f;
+  --color-flat: #8a8f98;
+  --color-action: #2f4bd8; /* links and buttons only */
+
+  /* Tinted backgrounds for the two directional states. Used sparingly, only
+     behind a signal badge - never as a section wash. */
+  --color-bull-wash: #eaf5f0;
+  --color-bear-wash: #fbeceb;
+
+  /* One radius. */
+  --radius-ui: 6px;
+
+  /* Two families, that is the budget. Values are wired up in layout.tsx. */
+  --font-sans: var(--font-public-sans), ui-sans-serif, system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SF Mono", "Cascadia Mono",
+    Menlo, monospace;
+
+  /* Body plus two sizes above it. Nothing else. */
+  --text-body: 0.875rem; /* 14px */
+  --text-body--line-height: 1.5;
+  --text-lg: 1.125rem; /* 18px - section headings */
+  --text-lg--line-height: 1.4;
+  --text-xl: 1.75rem; /* 28px - page title, price hero */
+  --text-xl--line-height: 1.2;
+  --text-small: 0.8125rem; /* 13px - labels, timestamps */
+  --text-small--line-height: 1.45;
+
+  /* Skeletons must match final row height exactly. Layout shift on a price
+     table reads as a bug, so the number lives in one place. */
+  --spacing-row: 52px;
+}
+
+/* ==========================================================================
+   Dark mode.
+
+   `@theme` above only emits custom properties on `:root`, so dark mode is the
+   same properties redefined - which keeps the rule that colours are defined in
+   this file and nowhere else. Nothing in a component changes.
+
+   Three states, resolved server-side from the `mip_theme` cookie:
+     - no cookie    -> follow the OS, via prefers-color-scheme
+     - data-theme="light" -> stay light even on a dark OS
+     - data-theme="dark"  -> stay dark even on a light OS
+
+   The `:not([data-theme="light"])` guard is what makes an explicit light choice
+   survive a dark OS. Because the attribute is rendered on the server, the first
+   paint is already the right theme - no flash, and no theme script in the head.
+
+   The directional colours are not the light ones reused. #0e8a5f on #0f1114 is
+   under 3:1 and unreadable; these are lifted until they clear 4.5:1 against the
+   dark surface, because a price column nobody can read is not a design choice.
+   ========================================================================== */
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: #0f1114;
+    --color-surface: #16191d;
+    --color-ink: #e8eaed;
+    --color-muted: #9aa1ab;
+    --color-line: #272c33;
+    --color-bull: #35c98a;
+    --color-bear: #f2695c;
+    --color-flat: #8a9099;
+    --color-action: #8aa0ff;
+    --color-bull-wash: #122620;
+    --color-bear-wash: #2a1512;
+  }
+}
+
+:root[data-theme="dark"] {
+  --color-bg: #0f1114;
+  --color-surface: #16191d;
+  --color-ink: #e8eaed;
+  --color-muted: #9aa1ab;
+  --color-line: #272c33;
+  --color-bull: #35c98a;
+  --color-bear: #f2695c;
+  --color-flat: #8a9099;
+  --color-action: #8aa0ff;
+  --color-bull-wash: #122620;
+  --color-bear-wash: #2a1512;
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  /* Tells the browser to render its own chrome - scrollbars, form controls,
+     the UA default canvas - to match. Without it a dark page keeps light
+     scrollbars and a white flash between navigations. */
+  :root {
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    margin: 0;
+    background: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: var(--text-body);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Every figure in the product. Applied here rather than per-component so a
+     new table cannot forget it. */
+  td,
+  th,
+  data,
+  time,
+  output,
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+
+  a {
+    color: var(--color-action);
+    text-decoration: none;
+  }
+
+  a:hover {
+    text-decoration: underline;
+  }
+
+  /* Visible focus everywhere. Accessibility is not a Phase 5 item. */
+  :focus-visible {
+    outline: 2px solid var(--color-action);
+    outline-offset: 2px;
+  }
+
+  /* No shadows anywhere in the design system. */
+  * {
+    box-shadow: none;
+  }
+}
+
+@layer utilities {
+  /* Shimmer for skeleton loaders. Respects reduced-motion. */
+  @keyframes mip-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+
+  .skeleton {
+    background: var(--color-line);
+    border-radius: var(--radius-ui);
+    animation: mip-pulse 1.6s ease-in-out infinite;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .skeleton {
+      animation: none;
+    }
+  }
+}

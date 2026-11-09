@@ -1,0 +1,16 @@
+{
+  "description": "Section 4 band thresholds. Read by BOTH apps/api/tests/test_signals.py and apps/web/src/lib/__tests__/signalBands.test.ts so the server and the UI cannot disagree about what a score means.",
+  "cases": [
+    { "score": -100, "band": "strong_bearish" },
+    { "score": -40.1, "band": "strong_bearish" },
+    { "score": -40, "band": "bearish" },
+    { "score": -15.1, "band": "bearish" },
+    { "score": -15, "band": "neutral" },
+    { "score": 0, "band": "neutral" },
+    { "score": 15, "band": "neutral" },
+    { "score": 15.1, "band": "bullish" },
+    { "score": 40, "band": "bullish" },
+    { "score": 40.1, "band": "strong_bullish" },
+    { "score": 100, "band": "strong_bullish" }
+  ]
+}
